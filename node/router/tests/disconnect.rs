@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,9 +16,10 @@
 mod common;
 use common::*;
 
-use snarkos_node_tcp::{protocols::Handshake, P2P};
+use snarkos_node_tcp::{P2P, protocols::Handshake};
 
 use core::time::Duration;
+use deadline::deadline;
 
 #[tokio::test]
 async fn test_disconnect_without_handshake() {
@@ -33,8 +35,12 @@ async fn test_disconnect_without_handshake() {
 
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
-    // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    // Await both nodes being connected.
+    let node0_ = node0.clone();
+    let node1_ = node1.clone();
+    deadline!(Duration::from_secs(1), move || {
+        node0_.tcp().num_connected() == 1 && node1_.tcp().num_connected() == 1
+    });
 
     print_tcp!(node0);
     print_tcp!(node1);
@@ -49,8 +55,9 @@ async fn test_disconnect_without_handshake() {
     // collection of connected peers is only altered during the handshake,
     // as well as the address resolver needed for the higher-level calls
     node0.tcp().disconnect(node1.local_ip()).await;
-    // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Await disconnection.
+    let node0_ = node0.clone();
+    deadline!(Duration::from_secs(1), move || { node0_.tcp().num_connected() == 0 });
 
     print_tcp!(node0);
     print_tcp!(node1);
@@ -79,8 +86,12 @@ async fn test_disconnect_with_handshake() {
 
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
-    // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    // Await for the nodes to be connected.
+    let node0_ = node0.clone();
+    let node1_ = node1.clone();
+    deadline!(Duration::from_secs(1), move || {
+        node0_.tcp().num_connected() == 1 && node1_.tcp().num_connected() == 1
+    });
 
     print_tcp!(node0);
     print_tcp!(node1);
@@ -97,8 +108,9 @@ async fn test_disconnect_with_handshake() {
 
     // Disconnect node0 from node1.
     node0.disconnect(node1.local_ip());
-    // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    // Await nodes being disconnected.
+    let node0_ = node0.clone();
+    deadline!(Duration::from_secs(1), move || { node0_.tcp().num_connected() == 0 });
 
     print_tcp!(node0);
     print_tcp!(node1);

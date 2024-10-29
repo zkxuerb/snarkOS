@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -13,20 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
     NodeType,
     Peer,
     Router,
+    messages::{ChallengeRequest, ChallengeResponse, DisconnectReason, Message, MessageCodec, MessageTrait},
 };
-use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
+use snarkos_node_tcp::{ConnectionSide, P2P, Tcp};
 use snarkvm::{
     ledger::narwhal::Data,
-    prelude::{block::Header, error, Address, Field, Network},
+    prelude::{Address, Field, Network, block::Header, error},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use futures::SinkExt;
-use rand::{rngs::OsRng, Rng};
+use rand::{Rng, rngs::OsRng};
 use std::{io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;

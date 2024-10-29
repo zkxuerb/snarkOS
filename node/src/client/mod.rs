@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -19,25 +20,25 @@ use snarkos_account::Account;
 use snarkos_node_bft::ledger_service::CoreLedgerService;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{
-    messages::{Message, NodeType, UnconfirmedSolution},
     Heartbeat,
     Inbound,
     Outbound,
     Router,
     Routing,
+    messages::{Message, NodeType, UnconfirmedSolution},
 };
 use snarkos_node_sync::{BlockSync, BlockSyncMode};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::{
     console::network::Network,
     ledger::{
+        Ledger,
         block::{Block, Header},
         puzzle::{Puzzle, Solution},
         store::ConsensusStorage,
-        Ledger,
     },
 };
 
@@ -47,7 +48,7 @@ use core::future::Future;
 use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::task::JoinHandle;
 
@@ -83,6 +84,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        rotate_external_peers: bool,
         shutdown: Arc<AtomicBool>,
     ) -> Result<Self> {
         // Initialize the signal handler.
@@ -116,6 +118,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            rotate_external_peers,
             allow_external_peers,
             matches!(storage_mode, StorageMode::Development(_)),
         )
@@ -167,7 +170,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
-                if node.shutdown.load(std::sync::atomic::Ordering::Relaxed) {
+                if node.shutdown.load(std::sync::atomic::Ordering::Acquire) {
                     info!("Shutting down block production");
                     break;
                 }
@@ -194,7 +197,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
 
         // Shut down the node.
         trace!("Shutting down the node...");
-        self.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.shutdown.store(true, std::sync::atomic::Ordering::Release);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");

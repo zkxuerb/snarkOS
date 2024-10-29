@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -19,17 +20,17 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_bft::{
+    BFT,
+    Primary,
     helpers::{
-        fmt_id,
-        init_consensus_channels,
         ConsensusReceiver,
         PrimaryReceiver,
         PrimarySender,
         Storage as NarwhalStorage,
+        fmt_id,
+        init_consensus_channels,
     },
     spawn_blocking,
-    Primary,
-    BFT,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
 use snarkos_node_bft_storage_service::BFTPersistentStorage;
@@ -50,7 +51,7 @@ use lru::LruCache;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
-    sync::{oneshot, OnceCell},
+    sync::{OnceCell, oneshot},
     task::JoinHandle,
 };
 

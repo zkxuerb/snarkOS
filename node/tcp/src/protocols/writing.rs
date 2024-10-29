@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -25,12 +26,12 @@ use tokio_util::codec::{Encoder, FramedWrite};
 use tracing::*;
 
 #[cfg(doc)]
-use crate::{protocols::Handshake, Config, Tcp};
+use crate::{Config, Tcp, protocols::Handshake};
 use crate::{
-    protocols::{Protocol, ProtocolHandler, ReturnableConnection},
     Connection,
     ConnectionSide,
     P2P,
+    protocols::{Protocol, ProtocolHandler, ReturnableConnection},
 };
 
 type WritingSenders = Arc<RwLock<HashMap<SocketAddr, mpsc::Sender<WrappedMessage>>>>;

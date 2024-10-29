@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -40,10 +41,10 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{is_bogon_ip, is_unspecified_or_broadcast_ip, Config, Tcp};
+use snarkos_node_tcp::{Config, Tcp, is_bogon_ip, is_unspecified_or_broadcast_ip};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
@@ -93,6 +94,8 @@ pub struct InnerRouter<N: Network> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The spawned handles.
     handles: Mutex<Vec<JoinHandle<()>>>,
+    /// If the flag is set, the node will periodically evict more external peers.
+    rotate_external_peers: bool,
     /// If the flag is set, the node will engage in P2P gossip to request more peers.
     allow_external_peers: bool,
     /// The boolean flag for the development mode.
@@ -111,12 +114,14 @@ impl<N: Network> Router<N> {
 
 impl<N: Network> Router<N> {
     /// Initializes a new `Router` instance.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         node_ip: SocketAddr,
         node_type: NodeType,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
+        rotate_external_peers: bool,
         allow_external_peers: bool,
         is_dev: bool,
     ) -> Result<Self> {
@@ -135,6 +140,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
+            rotate_external_peers,
             allow_external_peers,
             is_dev,
         })))
@@ -253,6 +259,11 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the node is in development mode.
     pub fn is_dev(&self) -> bool {
         self.is_dev
+    }
+
+    /// Returns `true` if the node is periodically evicting more external peers.
+    pub fn rotate_external_peers(&self) -> bool {
+        self.rotate_external_peers
     }
 
     /// Returns `true` if the node is engaging in P2P gossip to request more peers.
@@ -398,7 +409,10 @@ impl<N: Network> Router<N> {
         } else if N::ID == snarkvm::console::network::MainnetV0::ID {
             // Mainnet contains the following bootstrap peers.
             vec![
-                // TODO: Populate me with Mainnet Beta IP addresses.
+                SocketAddr::from_str("34.105.20.52:4130").unwrap(),
+                SocketAddr::from_str("35.231.118.193:4130").unwrap(),
+                SocketAddr::from_str("35.204.253.77:4130").unwrap(),
+                SocketAddr::from_str("34.87.188.140:4130").unwrap(),
             ]
         } else if N::ID == snarkvm::console::network::TestnetV0::ID {
             // TestnetV0 contains the following bootstrap peers.
@@ -514,6 +528,8 @@ impl<N: Network> Router<N> {
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_ip);
+        // Clear cached entries applicable to the peer.
+        self.cache.clear_peer_entries(peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
     }

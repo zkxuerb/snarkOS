@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2023 Aleo Systems Inc.
+// Copyright 2024 Aleo Network Foundation
 // This file is part of the snarkOS library.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at:
+
 // http://www.apache.org/licenses/LICENSE-2.0
 
 // Unless required by applicable law or agreed to in writing, software
@@ -15,7 +16,7 @@
 mod common;
 use common::*;
 
-use snarkos_node_tcp::{protocols::Handshake, P2P};
+use snarkos_node_tcp::{P2P, protocols::Handshake};
 
 use core::time::Duration;
 use deadline::deadline;
