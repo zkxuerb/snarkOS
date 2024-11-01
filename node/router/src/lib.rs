@@ -41,7 +41,8 @@ pub use routing::*;
 
 use crate::messages::NodeType;
 use snarkos_account::Account;
-use snarkos_node_tcp::{Config, Tcp, is_bogon_ip, is_unspecified_or_broadcast_ip};
+use snarkos_node_tcp::{Config, P2P, Tcp, is_bogon_ip, is_unspecified_or_broadcast_ip};
+
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{Result, bail};
@@ -105,6 +106,9 @@ pub struct InnerRouter<N: Network> {
 }
 
 impl<N: Network> Router<N> {
+    /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
+    #[cfg(not(any(test, feature = "test")))]
+    const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
@@ -112,9 +116,6 @@ impl<N: Network> Router<N> {
     /// The maximum amount of connection attempts withing a 10 second threshold
     #[cfg(not(any(test, feature = "test")))]
     const MAX_CONNECTION_ATTEMPTS: usize = 10;
-    /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
-    #[cfg(not(any(test, feature = "test")))]
-    const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
@@ -395,7 +396,8 @@ impl<N: Network> Router<N> {
 
     /// Returns the list of candidate peers.
     pub fn candidate_peers(&self) -> HashSet<SocketAddr> {
-        self.candidate_peers.read().clone()
+        let banned_ips = self.tcp().banned_peers().get_banned_ips();
+        self.candidate_peers.read().iter().filter(|peer| !banned_ips.contains(&peer.ip())).copied().collect()
     }
 
     /// Returns the list of restricted peers.

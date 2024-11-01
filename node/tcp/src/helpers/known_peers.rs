@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     net::IpAddr,
     sync::Arc,
     time::Instant,

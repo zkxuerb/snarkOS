@@ -22,7 +22,7 @@ use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkos_node_tcp::Tcp;
-use snarkvm::prelude::{block::Block, Network};
+use snarkvm::prelude::{Network, block::Block};
 
 use anyhow::{Result, bail, ensure};
 use indexmap::{IndexMap, IndexSet};
@@ -30,7 +30,7 @@ use itertools::Itertools;
 use parking_lot::{Mutex, RwLock};
 use rand::{CryptoRng, Rng, prelude::IteratorRandom};
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{
         Arc,
@@ -95,7 +95,7 @@ pub struct BlockSync<N: Network> {
     tcp: Tcp,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
-    locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
+    locators: Arc<RwLock<HashMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of peer-to-peer to their common ancestor.
     /// This map is used to determine which peers to request blocks from.
     common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
@@ -447,7 +447,7 @@ impl<N: Network> BlockSync<N> {
     /// Removes the peer from the sync pool, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
-        self.locators.write().swap_remove(peer_ip);
+        self.locators.write().remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
     }
@@ -712,7 +712,7 @@ impl<N: Network> BlockSync<N> {
                 if let Some((_, _, peer_ips)) = requests.get(height) { peer_ips.iter().for_each(|peer_ip| {
                         debug!("Removing peer {peer_ip} from block request {height}");
                         // Remove the locators entry for the given peer IP.
-                        locators.swap_remove(peer_ip);
+                        locators.remove(peer_ip);
                         if is_timeout {
                             peers_to_ban.insert(*peer_ip);
                         }
@@ -738,7 +738,6 @@ impl<N: Network> BlockSync<N> {
             let tcp = self.tcp.clone();
             tokio::spawn(async move {
                 tcp.disconnect(peer_ip).await;
-                trace!("Peer disconnected!");
             });
         }
 
@@ -982,7 +981,7 @@ mod tests {
     use snarkos_node_bft_ledger_service::MockLedgerService;
     use snarkvm::prelude::{Field, TestRng};
 
-    use indexmap::{indexset, IndexSet};
+    use indexmap::{IndexSet, indexset};
     use snarkos_node_tcp::Config;
     use snarkvm::ledger::committee::Committee;
     use std::net::{IpAddr, Ipv4Addr};

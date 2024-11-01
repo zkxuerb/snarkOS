@@ -1165,13 +1165,11 @@ impl<N: Network> Handshake for Gateway<N> {
             let num_attempts = self.cache.insert_inbound_connection(peer_addr.ip(), CONNECTION_ATTEMPTS_SINCE_SECS);
 
             debug!("Number of connection attempts from '{}': {}", peer_addr.ip(), num_attempts);
-            if num_attempts >= MAX_CONNECTION_ATTEMPTS
-            {
+            if num_attempts > MAX_CONNECTION_ATTEMPTS {
                 self.update_ip_ban(peer_addr.ip());
                 trace!("{CONTEXT} Gateway rejected a consecutive connection request from IP '{}'", peer_addr.ip());
                 return Err(error(format!("'{}' appears to be spamming connections", peer_addr.ip())));
             }
-
         }
 
         let stream = self.borrow_stream(&mut connection);

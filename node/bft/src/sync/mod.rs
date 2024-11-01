@@ -23,7 +23,7 @@ use crate::{
 };
 use snarkos_node_bft_events::{CertificateRequest, CertificateResponse, Event};
 use snarkos_node_bft_ledger_service::LedgerService;
-use snarkos_node_sync::{locators::BlockLocators, BlockSync, BlockSyncMode};
+use snarkos_node_sync::{BlockSync, BlockSyncMode, locators::BlockLocators};
 use snarkos_node_tcp::P2P;
 use snarkvm::{
     console::{network::Network, types::Field},

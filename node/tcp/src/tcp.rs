@@ -38,8 +38,6 @@ use tokio::{
 use tracing::*;
 
 use crate::{
-    connections::{Connection, ConnectionSide, Connections},
-    protocols::{Protocol, Protocols},
     BannedPeers,
     Config,
     KnownPeers,

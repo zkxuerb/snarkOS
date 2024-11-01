@@ -19,22 +19,27 @@ use parking_lot::RwLock;
 
 /// Contains the ban details for a banned peer.
 #[derive(Clone)]
-pub struct BanConfig {
+pub struct BanDetails {
     /// The time when the ban was created.
     banned_at: Instant,
 }
 
-impl BanConfig {
-    /// Creates a new ban config.
-    pub fn new(banned_at: Instant) -> Self {
-        Self { banned_at }
+impl BanDetails {
+    /// Creates a new ban at the given time.
+    pub fn new() -> Self {
+        Self { banned_at: Instant::now() }
     }
+}
 
+impl Default for BanDetails {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Contains the set of peers currently banned by IP.
 #[derive(Default)]
-pub struct BannedPeers(RwLock<HashMap<IpAddr, BanConfig>>);
+pub struct BannedPeers(RwLock<HashMap<IpAddr, BanDetails>>);
 
 impl BannedPeers {
     /// Check whether the given IP address is currently banned.
@@ -48,19 +53,17 @@ impl BannedPeers {
     }
 
     /// Get ban config for the given IP address.
-    pub fn get_ban_config(&self, ip: IpAddr) -> Option<BanConfig> {
+    pub fn get_ban_config(&self, ip: IpAddr) -> Option<BanDetails> {
         self.0.read().get(&ip).cloned()
     }
 
     /// Insert or update a banned IP.
     pub fn update_ip_ban(&self, ip: IpAddr) {
-        self.0.write().insert(ip, BanConfig::new(Instant::now()));
+        self.0.write().insert(ip, BanDetails::default());
     }
 
     /// Remove the expired entries
     pub fn remove_old_bans(&self, ban_time_in_secs: u64) {
-        self.0.write().retain(|_, ban_config| {
-            ban_config.banned_at.elapsed().as_secs() < ban_time_in_secs
-        });
+        self.0.write().retain(|_, ban_config| ban_config.banned_at.elapsed().as_secs() < ban_time_in_secs);
     }
 }

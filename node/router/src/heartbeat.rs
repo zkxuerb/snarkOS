@@ -21,7 +21,7 @@ use crate::{
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
-use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
+use rand::{Rng, prelude::IteratorRandom, rngs::OsRng};
 
 /// A helper function to compute the maximum of two numbers.
 /// See Rust issue 92391: https://github.com/rust-lang/rust/issues/92391.
@@ -237,16 +237,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         if num_deficient > 0 {
             // Initialize an RNG.
             let rng = &mut OsRng;
-            let banned_ips = self.tcp().banned_peers().get_banned_ips();
 
             // Attempt to connect to more peers.
-            for peer_ip in self
-                .router()
-                .candidate_peers()
-                .into_iter()
-                .filter(|peer| !banned_ips.contains(&peer.ip()))
-                .choose_multiple(rng, num_deficient)
-            {
+            for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
                 self.router().connect(peer_ip);
             }
 
