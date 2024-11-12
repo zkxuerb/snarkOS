@@ -15,7 +15,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{bft::MEMORY_POOL_PORT, router::messages::NodeType, Node};
+use snarkos_node::{Node, bft::MEMORY_POOL_PORT, router::messages::NodeType};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey},
@@ -25,7 +25,7 @@ use snarkvm::{
     ledger::{
         block::Block,
         committee::{Committee, MIN_DELEGATOR_STAKE, MIN_VALIDATOR_STAKE},
-        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        store::{ConsensusStore, helpers::memory::ConsensusMemory},
     },
     prelude::{FromBytes, ToBits, ToBytes},
     synthesizer::VM,
@@ -33,7 +33,7 @@ use snarkvm::{
 };
 
 use aleo_std::StorageMode;
-use anyhow::{bail, ensure, Result};
+use anyhow::{Result, bail, ensure};
 use clap::Parser;
 use colored::Colorize;
 use core::str::FromStr;
@@ -44,7 +44,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
 };
 use tokio::runtime::{self, Runtime};
 
@@ -59,7 +59,7 @@ const DEVELOPMENT_MODE_RNG_SEED: u64 = 1234567890u64;
 const DEVELOPMENT_MODE_NUM_GENESIS_COMMITTEE_MEMBERS: u16 = 4;
 
 /// The CDN base url.
-const CDN_BASE_URL: &str = "https://blocks.aleo.org";
+pub(crate) const CDN_BASE_URL: &str = "https://blocks.aleo.org";
 
 /// A mapping of `staker_address` to `(validator_address, withdrawal_address, amount)`.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -109,9 +109,12 @@ pub struct Start {
     /// Specify the IP address and port of the validator(s) to connect to
     #[clap(default_value = "", long = "validators")]
     pub validators: String,
-    /// If the flag is set, a node will allow untrusted peers to connect
+    /// If the flag is set, a validator will allow untrusted peers to connect
     #[clap(long = "allow-external-peers")]
     pub allow_external_peers: bool,
+    /// If the flag is set, a client will periodically evict more external peers
+    #[clap(long = "rotate-external-peers")]
+    pub rotate_external_peers: bool,
 
     /// Specify the IP address and port for the REST server
     #[clap(long = "rest")]
@@ -132,9 +135,13 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+
     /// Enables the metrics exporter
     #[clap(default_value = "false", long = "metrics")]
     pub metrics: bool,
+    /// Specify the IP address and port for the metrics exporter
+    #[clap(long = "metrics-ip")]
+    pub metrics_ip: Option<SocketAddr>,
 
     /// Specify the path to a directory containing the storage database for the ledger
     #[clap(long = "storage")]
@@ -381,11 +388,10 @@ impl Start {
             // Initialize the (fixed) RNG.
             let mut rng = ChaChaRng::seed_from_u64(DEVELOPMENT_MODE_RNG_SEED);
             // Initialize the development private keys.
-            let development_private_keys =
+            let dev_keys =
                 (0..num_committee_members).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
             // Initialize the development addresses.
-            let development_addresses =
-                development_private_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
+            let development_addresses = dev_keys.iter().map(Address::<N>::try_from).collect::<Result<Vec<_>>>()?;
 
             // Construct the committee based on the state of the bonded balances.
             let (committee, bonded_balances) = match &self.dev_bonded_balances {
@@ -465,7 +471,7 @@ impl Start {
             let public_balance_per_validator = remaining_balance.saturating_div(num_committee_members as u64);
 
             // Construct the public balances with fairly equal distribution.
-            let mut public_balances = development_private_keys
+            let mut public_balances = dev_keys
                 .iter()
                 .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
@@ -485,7 +491,7 @@ impl Start {
             }
 
             // Construct the genesis block.
-            load_or_compute_genesis(development_private_keys[0], committee, public_balances, bonded_balances, &mut rng)
+            load_or_compute_genesis(dev_keys[0], committee, public_balances, bonded_balances, self.dev, &mut rng)
         } else {
             // If the `dev_num_validators` flag is set, inform the user that it is ignored.
             if self.dev_num_validators.is_some() {
@@ -512,6 +518,12 @@ impl Start {
     async fn parse_node<N: Network>(&mut self, shutdown: Arc<AtomicBool>) -> Result<Node<N>> {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
+
+        // Check if we are running with the lower coinbase and proof targets. This should only be
+        // allowed in --dev mode.
+        if cfg!(feature = "test_targets") && self.dev.is_none() {
+            bail!("The 'test_targets' feature is enabled, but the '--dev' flag is not set");
+        }
 
         // Parse the trusted peers to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
@@ -576,7 +588,7 @@ impl Start {
 
         // Initialize the metrics.
         if self.metrics {
-            metrics::initialize_metrics();
+            metrics::initialize_metrics(self.metrics_ip);
         }
 
         // Initialize the storage mode.
@@ -601,7 +613,7 @@ impl Start {
         match node_type {
             NodeType::Validator => Node::new_validator(node_ip, self.bft, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, self.allow_external_peers, dev_txs, shutdown.clone()).await,
             NodeType::Prover => Node::new_prover(node_ip, account, &trusted_peers, genesis, storage_mode, shutdown.clone()).await,
-            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, shutdown).await,
+            NodeType::Client => Node::new_client(node_ip, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode, self.rotate_external_peers, shutdown).await,
         }
     }
 
@@ -660,6 +672,7 @@ fn load_or_compute_genesis<N: Network>(
     committee: Committee<N>,
     public_balances: indexmap::IndexMap<Address<N>, u64>,
     bonded_balances: indexmap::IndexMap<Address<N>, (Address<N>, Address<N>, u64)>,
+    dev_id: Option<u16>,
     rng: &mut ChaChaRng,
 ) -> Result<Block<N>> {
     // Construct the preimage.
@@ -755,7 +768,7 @@ fn load_or_compute_genesis<N: Network>(
     /* Otherwise, compute the genesis block and store it. */
 
     // Initialize a new VM.
-    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(Some(0))?)?;
+    let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(dev_id)?)?;
     // Initialize the genesis block.
     let block = vm.genesis_quorum(&genesis_private_key, committee, public_balances, bonded_balances, rng)?;
     // Write the genesis block to the file.
@@ -767,7 +780,7 @@ fn load_or_compute_genesis<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{Command, CLI};
+    use crate::commands::{CLI, Command};
     use snarkvm::prelude::MainnetV0;
 
     type CurrentNetwork = MainnetV0;

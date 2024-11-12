@@ -15,6 +15,11 @@
 
 use crate::common::sample_genesis_block;
 use snarkos_node_router::{
+    Heartbeat,
+    Inbound,
+    Outbound,
+    Router,
+    Routing,
     messages::{
         BlockRequest,
         DisconnectReason,
@@ -25,24 +30,19 @@ use snarkos_node_router::{
         UnconfirmedSolution,
         UnconfirmedTransaction,
     },
-    Heartbeat,
-    Inbound,
-    Outbound,
-    Router,
-    Routing,
 };
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Connection,
     ConnectionSide,
-    Tcp,
     P2P,
+    Tcp,
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
 };
 use snarkvm::prelude::{
-    block::{Block, Header, Transaction},
-    puzzle::Solution,
     Field,
     Network,
+    block::{Block, Header, Transaction},
+    puzzle::Solution,
 };
 
 use async_trait::async_trait;
@@ -93,8 +93,15 @@ impl<N: Network> Handshake for TestRouter<N> {
 
 #[async_trait]
 impl<N: Network> OnConnect for TestRouter<N> {
-    async fn on_connect(&self, _peer_addr: SocketAddr) {
-        // This behavior is currently not tested.
+    async fn on_connect(&self, peer_addr: SocketAddr) {
+        let peer_ip = if let Some(ip) = self.router().resolve_to_listener(&peer_addr) {
+            ip
+        } else {
+            panic!("The peer IP should be known by the time OnConnect is triggered!");
+        };
+
+        // Promote the peer's status from "connecting" to "connected".
+        self.router().insert_connected_peer(peer_ip);
     }
 }
 
