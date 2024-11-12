@@ -47,7 +47,7 @@ default-features = false
 [workspace.dependencies.snarkvm] # If this is updated, the rev in `node/rest/Cargo.toml` must be updated as well.
 #path = "../snarkVM"
 git = "https://github.com/AleoNet/snarkVM.git"
-rev = "dea322b"
+rev = "4eb83d7"
 #version = "=1.0.0"
 features = [ "circuit", "console", "rocks" ]
 
@@ -58,6 +58,7 @@ path = "snarkos/main.rs"
 [features]
 metrics = [ "snarkos-node-metrics", "snarkos-node/metrics" ]
 history = [ "snarkos-node/history" ]
+test_targets = [ "snarkos-cli/test_targets" ]
 
 [dependencies.anyhow]
 version = "1.0.79"
