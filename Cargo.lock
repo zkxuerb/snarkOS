@@ -3571,6 +3571,7 @@ dependencies = [
  "snarkos-node-router",
  "snarkos-node-sync-communication-service",
  "snarkos-node-sync-locators",
+ "snarkos-node-tcp",
  "snarkvm",
  "tokio",
  "tracing",
