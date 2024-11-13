@@ -65,9 +65,14 @@ use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use rand::seq::{IteratorRandom, SliceRandom};
-#[cfg(not(any(test, feature = "test")))]
-use std::net::IpAddr;
-use std::{collections::HashSet, future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    future::Future,
+    io,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     net::TcpStream,
     sync::{OnceCell, oneshot},
@@ -92,7 +97,6 @@ const MIN_CONNECTED_VALIDATORS: usize = 175;
 const MAX_VALIDATORS_TO_SEND: usize = 200;
 
 /// The minimum permitted interval between connection attempts for an IP; anything shorter is considered malicious.
-#[cfg(not(any(test, feature = "test")))]
 const CONNECTION_ATTEMPTS_SINCE_SECS: i64 = 10;
 /// The amount of time an IP address is prohibited from connecting.
 const IP_BAN_TIME_IN_SECS: u64 = 300;
@@ -469,13 +473,11 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Check whether the given IP address is currently banned.
-    #[cfg(not(any(test, feature = "test")))]
     fn is_ip_banned(&self, ip: IpAddr) -> bool {
         self.tcp.banned_peers().is_ip_banned(&ip)
     }
 
     /// Insert or update a banned IP.
-    #[cfg(not(any(test, feature = "test")))]
     fn update_ip_ban(&self, ip: IpAddr) {
         self.tcp.banned_peers().update_ip_ban(ip);
     }
@@ -1154,7 +1156,6 @@ impl<N: Network> Handshake for Gateway<N> {
         let peer_side = connection.side();
 
         // Check (or impose) IP-level bans.
-        #[cfg(not(any(test, feature = "test")))]
         if self.dev().is_none() && peer_side == ConnectionSide::Initiator {
             // If the IP is already banned reject the connection.
             if self.is_ip_banned(peer_addr.ip()) {
